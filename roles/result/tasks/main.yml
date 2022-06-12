@@ -1,0 +1,43 @@
+- name: Install nodejs and npm
+  apt:
+    name: ["nodejs","npm"]
+    update_cache: yes
+  register: change
+
+- name: Copy result.tar
+  copy:
+    src: result.tar
+    dest: /root/result.tar
+  when: change.changed
+
+- name: Unarchive result.tar
+  unarchive:
+    src: /root/result.tar
+    dest: /root
+    remote_src: yes
+  when: change.changed
+
+- name: Install dependencies
+  npm:
+    path: /root/result
+  when: change.changed
+
+- name: Copy result service
+  copy:
+    src: roles/result/files/result.service
+    dest: /etc/systemd/system/result.service
+  when: change.changed
+
+- name: Add environment
+  lineinfile:
+    path: /etc/systemd/system/result.service
+    state: present
+    regexp: '^Environment'
+    line: Environment="PORT={{ port }}" "POSTGRESQL_HOST={{ postgresql_host }}" "POSTGRESQL_PORT={{ postgresql_port }}" "POSTGRESQL_USER={{ postgresql_user }}" "POSTGRESQL_PASSWORD={{ postgresql_password }}" "POSTGRESQL_DB={{ postgresql_db }}"
+  when: change.changed
+
+- name: check if result service start
+  systemd:
+    name: result
+    state: started
+  when: change.changed

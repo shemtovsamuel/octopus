@@ -1,0 +1,20 @@
+- name: Install Redis
+  apt:
+    name: redis-server
+    update-cache: yes
+  register: change
+
+- name: Redis Sets up
+  lineinfile: 
+    dest: /etc/redis/redis.conf
+    regexp: '^bind '
+    line: 'bind 0.0.0.0'
+    state: present
+  when: change.changed
+
+- name: Redis restart
+  service:
+    name: redis
+    state: restarted
+    enabled: yes
+  when: change.changed

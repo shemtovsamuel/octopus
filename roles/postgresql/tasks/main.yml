@@ -1,0 +1,64 @@
+- name: Install psycopg2
+  apt:
+    name: python-psycopg2
+    update_cache: yes
+  register: change
+
+- name: Put PostgreSQL12 int repository
+  apt_repository:
+    repo: deb http://apt.postgresql.org/pub/repos/apt/ buster-pgdg main
+    update_cache: no
+    state: present
+  when: change.changed
+
+- name: GPG Key
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+  when: change.changed
+
+- name: Install PostgreSQL 12
+  apt:
+    name: postgresql
+    state: present
+    update_cache: yes
+  when: change.changed
+
+- name: Check if postgresql is started
+  service:
+    name: postgresql
+    state: started
+  when: change.changed
+
+- name: Create database
+  become: yes
+  become_user: postgres
+  postgresql_db:
+    name: "{{ postgresql_db }}"
+    state: present
+  when: change.changed
+
+- name: Create a user with the password and limited permissions
+  become: yes
+  become_user: postgres
+  postgresql_user:
+    db: "{{ postgresql_db }}"
+    name: "{{ postgresql_user }}"
+    password: "{{ postgresql_password }}"
+    priv: ALL
+    state: present
+  when: change.changed
+    
+- name: Copy schema.sql 
+  copy:
+    src: roles/postgresql/files/schema.sql
+    dest: /tmp/schema.sql
+  when: change.changed
+
+- name: Create the schema of the database
+  become: true
+  become_user: postgres
+  postgresql_query:
+    db: "{{ postgresql_db }}"
+    path_to_script: /tmp/schema.sql
+  when: change.changed

@@ -1,0 +1,71 @@
+- name: key gpg
+  apt_key:
+    url: https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public/
+    state: present
+  register: change
+
+- name: Add adoptopenjdk repository
+  apt_repository:
+    repo: deb https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/ buster main
+    update_cache: no
+    state: present
+  when: change.changed
+
+- name: Install adoptopenjdk
+  apt:
+    name: adoptopenjdk-8-hotspot
+    state: present
+    update_cache: yes
+  when: change.changed
+
+- name: Install maven
+  apt:
+    name: maven
+    state: present
+    update_cache: yes
+  when: change.changed
+
+- name: Copy worker tar
+  copy:
+    src: worker.tar
+    dest: /root/worker.tar
+  when: change.changed
+
+- name: Extract worker tar
+  unarchive:
+    src: /root/worker.tar
+    dest: /root
+    remote_src: yes
+  when: change.changed
+
+- name: Dependencies
+  command:
+    chdir: /root/worker/
+    cmd: mvn dependency:resolve
+  when: change.changed
+
+- name: Build the worker
+  command:
+    chdir: /root/worker/
+    cmd: mvn package
+  when: change.changed
+
+- name: Copy worker service
+  copy:
+    src: roles/worker/files/worker.service
+    dest: /etc/systemd/system/worker.service
+  when: change.changed
+
+- name: Add environment
+  lineinfile:
+    path: /etc/systemd/system/worker.service
+    state: present
+    regexp: '^Environment'
+    line: Environment="REDIS_HOST={{ redis_host }}" "POSTGRESQL_HOST={{ postgresql_host }}" "POSTGRESQL_PORT={{ postgresql_port }}" "POSTGRESQL_USER={{ postgresql_user }}" "POSTGRESQL_PASSWORD={{ postgresql_password }}" "POSTGRESQL_DB={{ postgresql_db }}"
+  when: change.changed
+
+- name: Check if worker service start
+  systemd:
+    name: worker
+    state: started
+  when: change.changed

@@ -1,0 +1,50 @@
+- name: Copy poll service
+  copy:
+    src: poll.tar
+    dest: /root/poll.tar
+  register: change
+
+- name: Upload poll service
+  unarchive:
+    src: /root/poll.tar
+    dest: /root
+    remote_src: yes
+  when: change.changed
+
+- name: Install python setuptools
+  apt:
+    name: python-setuptools
+    update_cache: yes
+  when: change.changed
+
+- name: Install python3
+  apt:
+    name: python3-pip
+    update_cache: yes
+  when: change.changed
+
+- name: Install dependencies
+  pip:
+    executable: pip3
+    requirements: /root/poll/requirements.txt
+  when: change.changed
+
+- name: Copy poll service
+  copy:
+    src: roles/poll/files/poll.service
+    dest: /etc/systemd/system/poll.service
+  when: change.changed
+
+- name: Add Environment
+  lineinfile:
+    path: /etc/systemd/system/poll.service
+    state: present
+    regexp: '^Environment'
+    line: Environment="REDIS_HOST={{ redis_host }}"
+  when: change.changed
+
+- name: Check if poll service start
+  systemd:
+    name: poll
+    state: started
+  when: change.changed

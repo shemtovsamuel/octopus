@@ -1,0 +1,13 @@
+- name: Install useful packages and configures instance
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  with_items:
+    - apt-transport-https
+    - ca-certificates
+    - wget
+    - dirmngr
+    - gnupg
+    - gnupg2
+    - software-properties-common
